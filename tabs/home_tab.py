@@ -1,3 +1,5 @@
+import sys
+import os
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpacerItem, QSizePolicy, QListWidget, QTableWidget, QTableWidgetItem
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
@@ -13,6 +15,18 @@ class HomeTab(QWidget):
         self.main_window = main_window
         self.init_home_tab()
 
+    @staticmethod
+    def resource_path(relative_path):
+        """Get absolute path to resource, works for development and PyInstaller bundled app"""
+        if getattr(sys, 'frozen', False):  # If the app is packaged
+            base_path = sys._MEIPASS  # PyInstaller stores path in _MEIPASS
+        else:
+            base_path = os.path.abspath(".")  # Use the current working directory in development
+        return os.path.join(base_path, relative_path)
+
+    def get_public_suffix_list_path(self):
+        return self.resource_path('whois/data/public_suffix_list.dat')
+
     def init_home_tab(self):
         layout = QVBoxLayout()
 
@@ -21,7 +35,8 @@ class HomeTab(QWidget):
 
         # Load and display the logo (smaller size)
         self.logo_label = QLabel(self)
-        pixmap = QPixmap("assets/red_team_logo.png")
+        logo_path = self.resource_path('assets/red_team_logo.png')
+        pixmap = QPixmap(logo_path)
         self.logo_label.setPixmap(pixmap.scaled(250, 250, Qt.AspectRatioMode.KeepAspectRatio))  # Adjust logo path if needed
         self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.logo_label)
@@ -32,7 +47,7 @@ class HomeTab(QWidget):
         # URL Input box
         self.url_input = QLineEdit(self)
         self.url_input.setPlaceholderText("Enter URL")
-        self.url_input.setFixedWidth(200)
+        self.url_input.setFixedWidth(300)
         self.url_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.url_input.setStyleSheet("padding: 5px; border-radius: 10px;")
 
@@ -75,7 +90,8 @@ class HomeTab(QWidget):
                 button.clicked.connect(self.open_domain_info_tab)  # Link to specific method for domain info
             else:
                 button.clicked.connect(self.open_tool_tab)
-            button.setFixedSize(150, 100)
+            button.setFixedSize(210, 100)
+            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             button.setStyleSheet("padding: 10px; border-radius: 15px;")
             tools_layout.addWidget(button)
 
@@ -84,8 +100,6 @@ class HomeTab(QWidget):
 
         # Add more space below tool buttons for a balanced layout
         layout.addSpacerItem(QSpacerItem(20, 60, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        layout.addLayout(tools_layout)
 
         self.setLayout(layout)
 

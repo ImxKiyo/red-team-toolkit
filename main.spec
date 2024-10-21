@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('assets/red_team_logo.png', 'assets'),('venv/Lib/site-packages/whois/data/public_suffix_list.dat', 'whois/data')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

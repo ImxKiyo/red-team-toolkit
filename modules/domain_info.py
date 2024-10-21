@@ -12,7 +12,7 @@ class DomainInfo:
     def find_dom_info(self):
         try:
             dom_info = whois(self.domain)
-            return {
+            domain_info = {
                 "Name": dom_info.domain_name,
                 "Registrar": dom_info.registrar,
                 "Creation date": dom_info.creation_date,
@@ -21,8 +21,9 @@ class DomainInfo:
                 "Status": dom_info.status,
                 "Servers": dom_info.name_servers
             }
+            return domain_info
         except Exception as ex:
-            return f"Error: {str(ex)}"
+            return {"Error": str(ex)}
 
     def dom_to_ip(self):
         try:

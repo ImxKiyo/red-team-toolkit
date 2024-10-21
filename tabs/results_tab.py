@@ -32,11 +32,16 @@ class ResultsTab(QWidget):
             domain_info = DomainInfo(self.url)
             dom_info = domain_info.find_dom_info()
 
-            if "Error" in dom_info:
+            print(f"Type of dom_info: {type(dom_info)}")  # Debugging
+            print(f"Content of dom_info: {dom_info}")  # Debugging
+
+            if isinstance(dom_info, dict) and "Error" in dom_info:
                 # Handle error case
                 error_msg = QLabel(f"Failed to fetch domain information: {dom_info['Error']}", self)
                 domain_info_container.addWidget(error_msg)
                 return  # Exit early if there's an error
+            else:
+                print(f"Unexpected type for dom_info: {type(dom_info)}")
 
             if isinstance(dom_info, dict):
                 # Add IP address to domain information
