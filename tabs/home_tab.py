@@ -3,11 +3,13 @@ import os
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpacerItem, QSizePolicy, QListWidget, QTableWidget, QTableWidgetItem
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
-from modules.domain_info import DomainInfo  # Ensure this import is correct
 from modules.ping import ping_website
+from tabs.port_scanner_tab import PortScannerTab
 from tabs.results_tab import ResultsTab
-from tabs.domain_info_tab import DomainInfoTab  # Import the DomainInfoTab class
-
+from tabs.domain_info_tab import DomainInfoTab
+from tabs.sql_injection_checker_tab import SQLInjectionTab
+from tabs.html_injection_checker_tab import HTMLInjectionTab
+from tabs.xss_checker_tab import XSSTesterTab
 
 class HomeTab(QWidget):
     def __init__(self, main_window):
@@ -18,8 +20,8 @@ class HomeTab(QWidget):
     @staticmethod
     def resource_path(relative_path):
         """Get absolute path to resource, works for development and PyInstaller bundled app"""
-        if getattr(sys, 'frozen', False):  # If the app is packaged
-            base_path = sys._MEIPASS  # PyInstaller stores path in _MEIPASS
+        if getattr(sys, 'frozen', False):
+            base_path = sys._MEIPASS
         else:
             base_path = os.path.abspath(".")  # Use the current working directory in development
         return os.path.join(base_path, relative_path)
@@ -87,9 +89,15 @@ class HomeTab(QWidget):
         for tool in tool_names:
             button = QPushButton(tool, self)
             if tool == "Domain Info And Subdomains":
-                button.clicked.connect(self.open_domain_info_tab)  # Link to specific method for domain info
-            else:
-                button.clicked.connect(self.open_tool_tab)
+                button.clicked.connect(self.open_domain_info_tab)
+            elif tool == "Port Scanner":
+                button.clicked.connect(self.open_port_scanner_tab) # Link to specific method for domain info
+            elif tool == "SQL Injection Checker":
+                button.clicked.connect(self.open_sql_injection_checker_tab)
+            elif tool == "HTML Injection Checker":
+                button.clicked.connect(self.open_html_injection_checker_tab)
+            elif tool == "Cross-Site Scripting Checker":
+                button.clicked.connect(self.open_xss_checker_tab)
             button.setFixedSize(210, 100)
             button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             button.setStyleSheet("padding: 10px; border-radius: 15px;")
@@ -109,34 +117,38 @@ class HomeTab(QWidget):
         self.main_window.tabs.addTab(domain_info_tab, f"Domain Info & Subdomains")
         self.main_window.tabs.setCurrentWidget(domain_info_tab)
 
-    def open_tool_tab(self):
-        sender = self.sender()
-        tool_name = sender.text()
+    def open_port_scanner_tab(self):
+        """
+        Open the Port Scanner tab and switch to it.
+        """
+        port_scanner_tab = PortScannerTab(self.main_window)
+        self.main_window.tabs.addTab(port_scanner_tab, "Port Scanner")
+        self.main_window.tabs.setCurrentWidget(port_scanner_tab)
 
-        # Create a new tab for the tool
-        tool_tab = QWidget()
-        tool_layout = QVBoxLayout()
+    def open_sql_injection_checker_tab(self):
+        """Opens the Sql Injection Checker Tab."""
+        sql_injection_checker_tab = SQLInjectionTab(self.main_window)
+        self.main_window.tabs.addTab(sql_injection_checker_tab, f"SQL Injection Checker")
+        self.main_window.tabs.setCurrentWidget(sql_injection_checker_tab)
 
-        # Title and input box
-        tool_title = QLabel(tool_name, self)
-        tool_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        tool_layout.addWidget(tool_title)
+    def open_html_injection_checker_tab(self):
+        """Opens the HTML Injection Checker Tab."""
+        html_injection_checker_tab = HTMLInjectionTab(self.main_window)
+        self.main_window.tabs.addTab(html_injection_checker_tab, f"HTML Injection Checker")
+        self.main_window.tabs.setCurrentWidget(html_injection_checker_tab)
 
-        # Input box
-        input_box = QLineEdit(self)
-        input_box.setPlaceholderText(f"Enter data for {tool_name}")
-        tool_layout.addWidget(input_box)
+    def open_xss_checker_tab(self):
+        """Opens the xss Checker Tab."""
+        xss_checker_tab = XSSTesterTab(self.main_window)
+        self.main_window.tabs.addTab(xss_checker_tab, f"Cross-Site Scripting Checker")
+        self.main_window.tabs.setCurrentWidget(xss_checker_tab)
 
-        # Results area
-        results_label = QLabel("Results", self)
-        tool_layout.addWidget(results_label)
-
-        tool_tab.setLayout(tool_layout)
-        self.main_window.tabs.addTab(tool_tab, tool_name)
-        self.main_window.tabs.setCurrentWidget(tool_tab)
 
     def full_scan(self):
         url = self.url_input.text()
+        if not url:  # If input is empty
+            self.show_error("Please enter a URL to proceed.")  # Show error if empty
+            return
         print(f"Scanning URL: {url}")  # Debugging output
 
         # Normalize URL by adding "http://" if it doesn't start with "http"

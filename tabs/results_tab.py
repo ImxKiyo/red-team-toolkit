@@ -1,6 +1,11 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QListWidget
-from PyQt6.QtCore import Qt
-from modules.domain_info import DomainInfo  # Adjust this import based on your project structure
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QScrollArea, QSizePolicy
+from PyQt6.QtCore import Qt, QTimer
+from modules.domain_info import DomainInfo
+from modules.port_scanner import quick_scan
+from modules.sql_inj_check import SQLInjectionTester
+from modules.html_injection_tester import HtmlInjectionTester
+from modules.xss_tester import XSSTester
+import threading
 
 
 class ResultsTab(QWidget):
@@ -8,19 +13,37 @@ class ResultsTab(QWidget):
         super().__init__()
         self.url = url
         self.main_window = main_window
-        self.init_results_tab()
+        self.layout = QVBoxLayout()
 
-    def init_results_tab(self):
-        layout = QVBoxLayout()
+        # Add Heading
+        heading_label = QLabel(f"Results for: {self.url}", self)
+        heading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        heading_label.setStyleSheet("font-size: 24px; font-weight: bold; color: rgb(215, 38, 61);")
+        self.layout.addWidget(heading_label)
 
-        # Display domain information and subdomains
-        self.display_domain_info(layout)
-        self.display_subdomains(layout)
+        # Start running the scans
+        threading.Thread(target=self.run_full_scan, daemon=True).start()
 
-        self.setLayout(layout)
+        # Add a scrollable layout for results
+        scroll_area = QScrollArea(self)
+        scroll_widget = QWidget()
+        scroll_widget.setLayout(self.layout)
+        scroll_area.setWidget(scroll_widget)
+        scroll_area.setWidgetResizable(True)
 
-    def display_domain_info(self, layout):
-        """Fetch and display domain information in a table."""
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(scroll_area)
+        self.setLayout(main_layout)
+
+    def run_full_scan(self):
+        QTimer.singleShot(0, self.add_domain_info)
+        QTimer.singleShot(0, self.add_port_scan_results)
+        QTimer.singleShot(0, self.add_sql_injection_results)
+        QTimer.singleShot(0, self.add_html_injection_results)
+        QTimer.singleShot(0, self.add_xss_injection_results)
+
+    def add_domain_info(self):
+        # Fetch domain info
         domain_info_container = QVBoxLayout()
         domain_info_label = QLabel("Domain Information", self)
         domain_info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -28,81 +51,138 @@ class ResultsTab(QWidget):
         domain_info_container.addWidget(domain_info_label)
 
         try:
-            # Use DomainInfo to fetch domain information
             domain_info = DomainInfo(self.url)
             dom_info = domain_info.find_dom_info()
-
-            print(f"Type of dom_info: {type(dom_info)}")  # Debugging
-            print(f"Content of dom_info: {dom_info}")  # Debugging
-
-            if isinstance(dom_info, dict) and "Error" in dom_info:
-                # Handle error case
+            if "Error" in dom_info:
                 error_msg = QLabel(f"Failed to fetch domain information: {dom_info['Error']}", self)
                 domain_info_container.addWidget(error_msg)
-                return  # Exit early if there's an error
             else:
-                print(f"Unexpected type for dom_info: {type(dom_info)}")
-
-            if isinstance(dom_info, dict):
-                # Add IP address to domain information
-                ip_address = domain_info.dom_to_ip()  # Always attempt to resolve IP
+                ip_address = domain_info.dom_to_ip()
                 dom_info["IP Address"] = ip_address if isinstance(ip_address, str) else "Could not resolve IP"
 
-                # Domain Information Table
-                domain_info_table = QTableWidget(len(dom_info), 2, self)
-                domain_info_table.setHorizontalHeaderLabels(["Type", "Information"])
-
+                table = QTableWidget(len(dom_info), 2, self)
+                table.setHorizontalHeaderLabels(["Type", "Information"])
+                table.setFixedHeight(300)
                 for i, (key, value) in enumerate(dom_info.items()):
-                    domain_info_table.setItem(i, 0, QTableWidgetItem(key))
-                    domain_info_table.setItem(i, 1, QTableWidgetItem(str(value)))
-
-                domain_info_table.horizontalHeader().setStretchLastSection(True)
-                domain_info_table.resizeColumnsToContents()  # Make sure table fits
-                domain_info_container.addWidget(domain_info_table)
-            else:
-                raise ValueError("Domain information must be a dictionary.")
-
+                    table.setItem(i, 0, QTableWidgetItem(key))
+                    table.setItem(i, 1, QTableWidgetItem(str(value)))
+                table.horizontalHeader().setStretchLastSection(True)
+                table.resizeColumnsToContents()
+                domain_info_container.addWidget(table)
         except Exception as e:
-            print(f"Error fetching domain info: {e}")  # Debugging output
-            error_msg = QLabel(f"Failed to fetch domain information: {str(e)}", self)
-            domain_info_container.addWidget(error_msg)
+            domain_info_container.addWidget(QLabel(f"Error fetching domain info: {e}"))
 
-        layout.addLayout(domain_info_container)
+        self.layout.addLayout(domain_info_container)
 
-    def display_subdomains(self, layout):
-        """Fetch and display subdomains in a list."""
-        subdomain_container = QVBoxLayout()
-        subdomain_label = QLabel("Subdomains", self)
-        subdomain_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subdomain_label.setStyleSheet("font-size: 18px; font-weight: bold; color: rgb(215, 38, 61);")
-        subdomain_container.addWidget(subdomain_label)
+    def add_port_scan_results(self):
+        # Perform quick scan
+        port_scan_container = QVBoxLayout()
+        port_scan_label = QLabel("Port Scan Results (Quick Scan)", self)
+        port_scan_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        port_scan_label.setStyleSheet("font-size: 18px; font-weight: bold; color: rgb(215, 38, 61);")
+        port_scan_container.addWidget(port_scan_label)
 
         try:
-            # Use DomainInfo to fetch subdomains
-            domain_info = DomainInfo(self.url)  # Ensure self.url is correctly passed
-            subdomains = domain_info.subdom()  # Use subdom() method to fetch subdomains
+            results = quick_scan(self.url)
+            table = QTableWidget(len(results), 2, self)
+            table.setHorizontalHeaderLabels(["Port", "Service"])
+            table.setFixedHeight(300)
+            for i, (port, service) in enumerate(results.items()):
+                table.setItem(i, 0, QTableWidgetItem(str(port)))
+                table.setItem(i, 1, QTableWidgetItem(service))
+            table.horizontalHeader().setStretchLastSection(True)
+            table.resizeColumnsToContents()
+            port_scan_container.addWidget(table)
+        except Exception as e:
+            port_scan_container.addWidget(QLabel(f"Error performing port scan: {e}"))
 
-            if isinstance(subdomains, set) and subdomains:  # Check for non-empty set
-                subdomain_list = QListWidget(self)
-                subdomain_list.addItems(list(subdomains))  # Convert set to list for QListWidget
-                subdomain_list.itemClicked.connect(self.open_subdomain_tab)  # Connect item click to method
-                subdomain_container.addWidget(subdomain_list)
+        self.layout.addLayout(port_scan_container)
+
+    def add_sql_injection_results(self):
+        # Test SQL Injection
+        sql_injection_container = QVBoxLayout()
+        sql_injection_label = QLabel("SQL Injection Results", self)
+        sql_injection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sql_injection_label.setStyleSheet("font-size: 18px; font-weight: bold; color: rgb(215, 38, 61);")
+        sql_injection_container.addWidget(sql_injection_label)
+
+        try:
+            tester = SQLInjectionTester(self.url, {
+                "1": ["Error Based Payload", "' OR '1'='1"],
+                "2": ["Basic Payload", "' OR 1=1 --"]
+            })
+            tester.extract_input_field_names()
+            tester.test_payloads()
+
+            if not tester.results:
+                sql_injection_container.addWidget(QLabel("No vulnerabilities found or testing failed."))
             else:
-                raise ValueError("Subdomains must be a non-empty set.")
+                table = QTableWidget(len(tester.results), 3, self)
+                table.setHorizontalHeaderLabels(["Field Name", "Payload", "Result"])
+                table.setFixedHeight(300)
+                for i, (field_name, payload, result) in enumerate(tester.results):
+                    table.setItem(i, 0, QTableWidgetItem(field_name))
+                    table.setItem(i, 1, QTableWidgetItem(payload))
+                    table.setItem(i, 2, QTableWidgetItem(result))
+                table.horizontalHeader().setStretchLastSection(True)
+                table.resizeColumnsToContents()
+                sql_injection_container.addWidget(table)
 
         except Exception as e:
-            print(f"Error fetching subdomains: {e}")  # Debugging output
-            error_msg = QLabel(f"Failed to fetch subdomains: {str(e)}", self)
-            subdomain_container.addWidget(error_msg)
+            sql_injection_container.addWidget(QLabel(f"Error testing SQL Injection: {e}"))
 
-        layout.addLayout(subdomain_container)
+        self.layout.addLayout(sql_injection_container)
 
-    def open_subdomain_tab(self, item):
-        """Handle clicking on a subdomain to perform a scan."""
-        subdomain = item.text()
-        self.full_scan_for_subdomain(subdomain)
+    def add_html_injection_results(self):
+        # Test HTML Injection
+        html_injection_container = QVBoxLayout()
+        html_injection_label = QLabel("HTML Injection Results", self)
+        html_injection_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        html_injection_label.setStyleSheet("font-size: 18px; font-weight: bold; color: rgb(215, 38, 61);")
+        html_injection_container.addWidget(html_injection_label)
 
-    def full_scan_for_subdomain(self, subdomain):
-        """Perform a full scan for the provided subdomain."""
-        # Implement the logic for scanning the subdomain.
-        print(f"Scanning subdomain: {subdomain}")  # Add functionality as needed
+        try:
+            tester = HtmlInjectionTester(self.url)
+            tester.extract_input_fields()
+            tester.test_injection()
+
+            table = QTableWidget(len(tester.results), 2, self)
+            table.setHorizontalHeaderLabels(["Field Name", "Result"])
+            table.setFixedHeight(300)
+            for i, (field_name, result) in enumerate(tester.results):
+                table.setItem(i, 0, QTableWidgetItem(field_name))
+                table.setItem(i, 1, QTableWidgetItem(result))
+            table.horizontalHeader().setStretchLastSection(True)
+            table.resizeColumnsToContents()
+            html_injection_container.addWidget(table)
+        except Exception as e:
+            html_injection_container.addWidget(QLabel(f"Error testing HTML Injection: {e}"))
+
+        self.layout.addLayout(html_injection_container)
+
+    def add_xss_injection_results(self):
+        # Test XSS Injection
+        xss_container = QVBoxLayout()
+        xss_label = QLabel("XSS Injection Results", self)
+        xss_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        xss_label.setStyleSheet("font-size: 18px; font-weight: bold; color: rgb(215, 38, 61);")
+        xss_container.addWidget(xss_label)
+
+        try:
+            tester = XSSTester(self.url)
+            tester.extract_input_fields()
+            tester.test_xss()
+
+            table = QTableWidget(len(tester.results), 2, self)
+            table.setHorizontalHeaderLabels(["Field Name", "Result"])
+            table.setFixedHeight(300)
+            for i, (field_name, result) in enumerate(tester.results):
+                table.setItem(i, 0, QTableWidgetItem(field_name))
+                table.setItem(i, 1, QTableWidgetItem(result))
+            table.horizontalHeader().setStretchLastSection(True)
+            table.resizeColumnsToContents()
+            xss_container.addWidget(table)
+        except Exception as e:
+            xss_container.addWidget(QLabel(f"Error testing XSS Injection: {e}"))
+
+        self.layout.addLayout(xss_container)

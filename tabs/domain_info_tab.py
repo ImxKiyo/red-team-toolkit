@@ -1,7 +1,6 @@
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QListWidget, QLineEdit, QSpacerItem, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QListWidget, QLineEdit, QSpacerItem, QSizePolicy, QScrollArea
 from PyQt6.QtCore import Qt
 from modules.domain_info import DomainInfo  # Ensure the correct path for your module
-
 
 class DomainInfoTab(QWidget):
     def __init__(self, main_window):
@@ -9,6 +8,7 @@ class DomainInfoTab(QWidget):
         self.main_window = main_window
         self.url_input = None
         self.layout = None
+        self.scroll_area = None
         self.init_domain_info_tab()
 
     def init_domain_info_tab(self):
@@ -36,8 +36,17 @@ class DomainInfoTab(QWidget):
         self.spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
         self.layout.addItem(self.spacer)
 
-        # Placeholder for dynamic content (domain info and subdomains)
-        self.setLayout(self.layout)
+        # Set up the scroll area to contain the layout
+        self.scroll_area = QScrollArea(self)
+        scroll_widget = QWidget()  # Create a QWidget to contain the layout
+        scroll_widget.setLayout(self.layout)  # Set the layout to the widget
+        self.scroll_area.setWidget(scroll_widget)  # Add the widget to the scroll area
+        self.scroll_area.setWidgetResizable(True)  # Ensure the widget resizes with the scroll area
+
+        # Set the scroll area as the main layout
+        main_layout = QVBoxLayout(self)
+        main_layout.addWidget(self.scroll_area)
+        self.setLayout(main_layout)
 
     def on_enter_pressed(self):
         """Handle the Enter key press to display domain info and subdomains."""
